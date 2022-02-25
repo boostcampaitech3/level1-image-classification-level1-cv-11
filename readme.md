@@ -46,7 +46,7 @@ COVID-19의 확산으로 우리나라는 물론 전 세계 사람들은 경제�
 
 예시:
 
-![img](https://s3-ap-northeast-2.amazonaws.com/aistages-public-junyeop/app/Users/00000025/files/835262ea-d9fc-4c87-a927-02b2a6dd5fb3..png)
+![image-20220225174452667](readme.assets/image-20220225174452667.png)
 
 **결과값.** 총 18개의 class를 예측해야합니다. 결과값으로 0~17에 해당되는 숫자가 각 이미지 당 하나씩 나와야합니다.
 
@@ -62,7 +62,7 @@ COVID-19의 확산으로 우리나라는 물론 전 세계 사람들은 경제�
 
 마스크 착용여부, 성별, 나이를 기준으로 총 18개의 클래스가 있습니다.
 
-![img](https://s3-ap-northeast-2.amazonaws.com/aistages-public-junyeop/app/Users/00000025/files/56bd7d05-4eb8-4e3e-884d-18bd74dc4864..png)
+![image-20220225174511882](readme.assets/image-20220225174511882.png)
 
 
 
@@ -83,7 +83,7 @@ COVID-19의 확산으로 우리나라는 물론 전 세계 사람들은 경제�
 
 - F1 Score 에 대해 간략한 설명
 
-  ![img](https://s3-us-west-2.amazonaws.com/aistages-prod-server-public/app/Users/00000118/files/8e23aa00-aa4a-42dd-a7f9-66bf2cacbecf..png)
+  ![image-20220225174428764](readme.assets/image-20220225174428764.png)
 
   In "macro" F1, a separate F1 score is calculated for each classes value and then averaged.
 
