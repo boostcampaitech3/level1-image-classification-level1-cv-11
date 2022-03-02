@@ -36,30 +36,12 @@ class BaseModel(nn.Module):
         return self.fc(x)
 
 
-def load_resnet18(class_num):
-    # ImageNet에서 학습된 ResNet 18 딥러닝 모델을 불러옴
-    imagenet_resnet18 = torchvision.models.resnet18(pretrained=True)
+def set_outfeature(class_num,trained_model):
+    model_ = trained_model(pretrained=True)
 
-    # 분류 모델의 output 크기가 1000개로 되어 있음으로 mnist data class 개수로 나올 수 있도록 Fully Connected Layer를 변경하고 xavier uniform으로 weight 초기화
-    imagenet_resnet18.fc = torch.nn.Linear(in_features=512, out_features=class_num, bias=True)
-    torch.nn.init.xavier_uniform_(imagenet_resnet18.fc.weight)
-    stdv = 1. / math.sqrt(imagenet_resnet18.fc.weight.size(1))
-    imagenet_resnet18.fc.bias.data.uniform_(-stdv, stdv)
+    model_.fc = torch.nn.Linear(in_features=model_.fc.in_features, out_features=class_num, bias=True)
+    torch.nn.init.xavier_uniform_(model_.fc.weight)
+    stdv = 1. / math.sqrt(model_.fc.weight.size(1))
+    model_.fc.bias.data.uniform_(-stdv, stdv)
 
-    print("네트워크 필요 입력 채널 개수", imagenet_resnet18.conv1.weight.shape[1])
-    print("네트워크 출력 채널 개수 (예측 class type 개수)", imagenet_resnet18.fc.weight.shape[0])
-    return imagenet_resnet18
-
-def load_resnet34(class_num):
-    # ImageNet에서 학습된 ResNet 18 딥러닝 모델을 불러옴
-    imagenet_resnet18 = torchvision.models.resnet34(pretrained=True)
-
-    # 분류 모델의 output 크기가 1000개로 되어 있음으로 mnist data class 개수로 나올 수 있도록 Fully Connected Layer를 변경하고 xavier uniform으로 weight 초기화
-    imagenet_resnet18.fc = torch.nn.Linear(in_features=512, out_features=class_num, bias=True)
-    torch.nn.init.xavier_uniform_(imagenet_resnet18.fc.weight)
-    stdv = 1. / math.sqrt(imagenet_resnet18.fc.weight.size(1))
-    imagenet_resnet18.fc.bias.data.uniform_(-stdv, stdv)
-
-    print("네트워크 필요 입력 채널 개수", imagenet_resnet18.conv1.weight.shape[1])
-    print("네트워크 출력 채널 개수 (예측 class type 개수)", imagenet_resnet18.fc.weight.shape[0])
-    return imagenet_resnet18
+    return model_
