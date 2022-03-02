@@ -1,13 +1,15 @@
-import pandas as pd
 import torch
 import torchvision.transforms as transforms
 from torchvision.transforms import *
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader 
+from torch.utils.data import Dataset
+import cv2
+import albumentations
+import albumentations.pytorch
 
-
+####################################transforms##########################################
 class BaseAugmentation:
-    def __init__(self,resize=(512, 384), mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
+    def __init__(self,resize=(512, 384), mean=(0.5, 0.5, 0.5), std=(0.2, 0.2, 0.2)):
         self.transform = transforms.Compose([
             Resize(resize, Image.BILINEAR),
             ToTensor(),
@@ -18,39 +20,32 @@ class BaseAugmentation:
         return self.transform(image)
 
 
-class AddGaussianNoise(object):
-    """
-        transform 에 없는 기능들은 이런식으로 __init__, __call__, __repr__ 부분을
-        직접 구현하여 사용할 수 있습니다.
-    """
-
-    def __init__(self, mean=0., std=1.):
-        self.std = std
-        self.mean = mean
-
-    def __call__(self, tensor):
-        return tensor + torch.randn(tensor.size()) * self.std + self.mean
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
-
-
-class CustomAugmentation:
-    def __init__(self, resize=(512, 384), mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
-        self.transform = transforms.Compose([
-            CenterCrop((320, 256)),
-            Resize(resize, Image.BILINEAR),
-            ColorJitter(0.1, 0.1, 0.1, 0.1),
-            ToTensor(),
-            Normalize(mean=mean, std=std),
-            AddGaussianNoise()
-        ])
-
-    def __call__(self, image):
-        return self.transform(image)
+def albumentations_transform(resize=(512, 384), mean=(0.5, 0.5, 0.5), std=(0.2, 0.2, 0.2)):
+    transform = albumentations.Compose([
+        albumentations.Resize(resize[0],resize[1]), 
+        albumentations.OneOf([
+                        albumentations.MotionBlur(p=1),
+                        albumentations.OpticalDistortion(p=1),
+                        albumentations.GaussNoise(p=1)                 
+        ], p=0.3),
+        albumentations.OneOf([
+                        albumentations.MotionBlur(p=1),
+                        albumentations.OpticalDistortion(p=1),
+                        albumentations.GaussNoise(p=1)                 
+        ], p=0.3),
+        albumentations.OneOf([
+                        albumentations.MotionBlur(p=1),
+                        albumentations.OpticalDistortion(p=1),
+                        albumentations.GaussNoise(p=1)                 
+        ], p=0.3),
+        albumentations.Normalize(mean=mean, std=std),
+        albumentations.pytorch.transforms.ToTensor()
+    ])
+    return transform
 
 
-class MaskDataset(Dataset):
+####################################### data sets #####################################################
+class CustomDataset(Dataset):
     def __init__(self,df,target,transform = None):
         self.X = df['path']
         self.y = df[target]
@@ -69,3 +64,24 @@ class MaskDataset(Dataset):
 
     def read_image(self, idx):
         return Image.open(self.x.iloc[idx])
+
+
+
+class AlbumentationsDataset(Dataset):
+    def __init__(self, df, target, transform=None):
+        self.x = df['path']
+        self.y = df[target]
+        self.transform = transform
+        
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, idx):
+        file_path = self.x.iloc[idx]
+        image = cv2.imread(file_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        if self.transform:
+            augmented = self.transform(image=image) 
+            image = augmented['image']
+        return image, torch.tensor(self.y.iloc[idx])
