@@ -66,7 +66,6 @@ class CustomDataset(Dataset):
         return Image.open(self.x.iloc[idx])
 
 
-
 class AlbumentationsDataset(Dataset):
     def __init__(self, df, target, transform=None):
         self.x = df['path']
