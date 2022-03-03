@@ -36,6 +36,7 @@ class BaseModel(nn.Module):
         return self.fc(x)
 
 
+# pretrained model 변형
 def set_outfeature(class_num,trained_model):
     model_ = trained_model(pretrained=True)
 
@@ -45,3 +46,109 @@ def set_outfeature(class_num,trained_model):
     model_.fc.bias.data.uniform_(-stdv, stdv)
 
     return model_
+
+
+# resnet34
+class Conv_Block_x2(nn.Module):
+    def __init__(self, in_channels, out_channels, stride):
+        super(Conv_Block_x2, self).__init__()
+
+        self.conv_1 = nn.Conv2d(in_channels, out_channels, (3, 3), stride, padding = (1, 1), bias = False)
+        self.bn_1 = nn.BatchNorm2d(out_channels)
+        
+        self.conv_2 = nn.Conv2d(out_channels, out_channels, (3, 3), 1, padding = (1, 1), bias = False)
+        self.bn_2 = nn.BatchNorm2d(out_channels)
+        
+        self.conv_shortcut = nn.Conv2d(in_channels, out_channels, (1, 1), stride, bias = False)
+        self.bn_shortcut = nn.BatchNorm2d(out_channels)
+        
+        self.relu = nn.ReLU()
+        
+    def forward(self, inputs):
+        x = self.conv_1(inputs)
+        x = self.bn_1(x)
+        x = self.relu(x)
+        
+        x = self.conv_2(x)
+        x = self.bn_2(x)
+        
+        shortcut = self.conv_shortcut(inputs)
+        shortcut = self.bn_shortcut(shortcut)
+        
+        x += shortcut
+        outputs = self.relu(x)
+        return outputs
+    
+class Identity_Block_x2(nn.Module):
+    def __init__(self, channels):
+        super(Identity_Block_x2, self).__init__()
+
+        self.conv_1 = nn.Conv2d(channels, channels, (1, 1), bias = False)
+        self.bn_1 = nn.BatchNorm2d(channels)
+        
+        self.conv_2 = nn.Conv2d(channels, channels, (3, 3), 1, padding = (1, 1), bias = False)
+        self.bn_2 = nn.BatchNorm2d(channels)
+        
+        self.relu = nn.ReLU()
+        
+    def forward(self, inputs):
+        x = self.conv_1(inputs)
+        x = self.bn_1(x)
+        x = self.relu(x)
+        
+        x = self.conv_2(x)
+        x = self.bn_2(x)
+        
+        x += inputs
+        outputs = self.relu(x)
+        return outputs
+    
+class ResNet34(nn.Module):
+    def __init__(self):
+        super(ResNet34, self).__init__()
+        self.block_1 = nn.Sequential(
+            nn.Conv2d(3, 64, (7, 7), 2, padding = (3, 3), bias = False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d((3, 3), 2, padding = (1, 1)),
+        )
+        
+        self.block_2 = nn.Sequential(
+            Identity_Block_x2(64),
+            Identity_Block_x2(64),
+            Identity_Block_x2(64),
+        )
+        
+        self.block_3 = nn.Sequential(
+            Conv_Block_x2(64, 128, 2),
+            Identity_Block_x2(128),
+            Identity_Block_x2(128),
+            Identity_Block_x2(128),
+        )
+        
+        self.block_4 = nn.Sequential(
+            Conv_Block_x2(128, 256, 2),
+            Identity_Block_x2(256),
+            Identity_Block_x2(256),
+            Identity_Block_x2(256),
+            Identity_Block_x2(256),
+            Identity_Block_x2(256),
+        )
+        
+        self.block_5 = nn.Sequential(
+            Conv_Block_x2(256, 512, 2),
+            Identity_Block_x2(512),
+            Identity_Block_x2(512),
+        )
+        
+        self.classifier = nn.Linear(512, 10)
+        
+    def forward(self, inputs):
+        x = self.block_1(inputs)
+        x = self.block_2(x)
+        x = self.block_3(x)
+        x = self.block_4(x)
+        x = self.block_5(x)
+        x = torch.mean(x, axis = [2, 3])
+        outputs = self.classifier(x)
+        return outputs

@@ -3,84 +3,96 @@ import torchvision.transforms as transforms
 from torchvision.transforms import *
 from PIL import Image
 from torch.utils.data import Dataset
-import cv2
-import albumentations
+import numpy as np
+import albumentations as A
 import albumentations.pytorch
+from albumentations import Compose, OneOf, Resize, Normalize
 
 ####################################transforms##########################################
-class BaseAugmentation:
-    def __init__(self,resize=(512, 384), mean=(0.5, 0.5, 0.5), std=(0.2, 0.2, 0.2)):
-        self.transform = transforms.Compose([
-            Resize(resize, Image.BILINEAR),
-            ToTensor(),
-            Normalize(mean=mean, std=std),
-        ])
-
-    def __call__(self, image):
-        return self.transform(image)
-
-
-def albumentations_transform(resize=(512, 384), mean=(0.5, 0.5, 0.5), std=(0.2, 0.2, 0.2)):
-    transform = albumentations.Compose([
-        albumentations.Resize(resize[0],resize[1]), 
-        albumentations.OneOf([
-                        albumentations.MotionBlur(p=1),
-                        albumentations.OpticalDistortion(p=1),
-                        albumentations.GaussNoise(p=1)                 
-        ], p=0.3),
-        albumentations.OneOf([
-                        albumentations.MotionBlur(p=1),
-                        albumentations.OpticalDistortion(p=1),
-                        albumentations.GaussNoise(p=1)                 
-        ], p=0.3),
-        albumentations.OneOf([
-                        albumentations.MotionBlur(p=1),
-                        albumentations.OpticalDistortion(p=1),
-                        albumentations.GaussNoise(p=1)                 
-        ], p=0.3),
-        albumentations.Normalize(mean=mean, std=std),
-        albumentations.pytorch.transforms.ToTensor()
+def train_transform(resize=(512, 384)):
+    transform = Compose([
+        Resize(resize[0], resize[1]),
+        A.HorizontalFlip(),
+        OneOf([
+            A.IAAAdditiveGaussianNoise(),
+            A.GaussNoise(),
+            ], p = 0.2),
+        OneOf([
+            A.MotionBlur(blur_limit = 3, p = 0.2),
+            A.MedianBlur(blur_limit = 3, p = 0.1),
+            A.Blur(blur_limit = 3, p = 0.1),
+            ], p = 0.2),
+        A.ShiftScaleRotate(rotate_limit = 15),
+        OneOf([
+            A.OpticalDistortion(p = 0.3),
+            A.GridDistortion(p = 0.1),
+            A.IAAPiecewiseAffine(p = 0.3),
+            ], p = 0.2),
+        OneOf([
+            A.CLAHE(clip_limit = 2),
+            A.IAASharpen(),
+            A.IAAEmboss(),
+            A.RandomBrightnessContrast(),
+            ], p = 0.3),
+        A.HueSaturationValue(p = 0.3),
+        Normalize(),
+        albumentations.pytorch.ToTensor(),
     ])
+    return transform
+
+def val_transform(resize=(512, 384)):
+    transform = Compose([
+            Resize(resize[0], resize[1]),
+            Normalize(),
+            albumentations.pytorch.ToTensor(),
+        ])
     return transform
 
 
 ####################################### data sets #####################################################
-class CustomDataset(Dataset):
-    def __init__(self,df,target,transform = None):
-        self.X = df['path']
-        self.y = df[target]
-        self.transform = transform
-        return
-
-    def __len__(self):
-        return len(self.y)
-
-    def __getitem__(self, idx):
-        img = Image.open(self.X.iloc[idx])
-        if self.transform:
-            img = self.transform(img)
-
-        return img, torch.tensor(self.y.iloc[idx])
-
-    def read_image(self, idx):
-        return Image.open(self.x.iloc[idx])
-
-
-class AlbumentationsDataset(Dataset):
-    def __init__(self, df, target, transform=None):
+class train_dataset(Dataset):
+    def __init__(self, df, target, transform = None, one_hot=False):
+        super(train_dataset, self).__init__()
         self.x = df['path']
         self.y = df[target]
         self.transform = transform
+        self.one_hot = one_hot
         
     def __len__(self):
         return len(self.y)
-
+    
     def __getitem__(self, idx):
-        file_path = self.x.iloc[idx]
-        image = cv2.imread(file_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        X = np.array(Image.open(self.x.iloc[idx]))
+        if self.one_hot:
+            y = np.eye(10)[self.y.iloc[idx]]         # onehot ending (단위행렬의 n번째 열)
+        else:
+            y = self.y.iloc[idx]
 
         if self.transform:
-            augmented = self.transform(image=image) 
-            image = augmented['image']
-        return image, torch.tensor(self.y.iloc[idx])
+            img = self.transform(image = X)['image']
+        else:
+            img = X
+        return img, torch.tensor(y)
+    
+
+class test_dataset(Dataset):
+    def __init__(self, imgs, transform = None, n_tta = None):
+        super(test_dataset, self).__init__()
+        self.imgs = imgs
+        self.transform = transform
+        self.n_tta = n_tta
+        
+    def __len__(self):
+        return len(self.imgs)
+    
+    def __getitem__(self, idx):
+        X = np.array(Image.open(self.imgs[idx]))
+        if self.transform:
+            if self.n_tta:
+                imgs = [self.transform(image = X)['image'] for _ in range(self.n_tta)]
+                return imgs
+            else:
+                img = self.transform(image = X)['image']
+                return img
+        else:
+            return X
